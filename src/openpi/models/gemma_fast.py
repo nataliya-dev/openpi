@@ -70,6 +70,26 @@ def get_config(variant):
                 },
             }
         )
+    if variant == "gemma_2b_lora_r128":
+        return ml_collections.ConfigDict(
+            {
+                "variant": variant,
+                "width": 2048,
+                "depth": 18,
+                "mlp_dim": 16_384,
+                "num_heads": 8,
+                "num_kv_heads": 1,
+                "head_dim": 256,
+                "norm_eps": 1e-6,
+                "vocab_size": 257_152,
+                "scan": True,
+                "remat_policy": "nothing_saveable",
+                "lora_configs": {
+                    "attn": lora.LoRAConfig(rank=128, alpha=128.0),
+                    "ffn": lora.LoRAConfig(rank=128, alpha=128.0),
+                },
+            }
+        )
     raise ValueError(f"Unknown variant: {variant}")
 
 
