@@ -672,7 +672,11 @@ _CONFIGS = [
         data=RLDSDroidDataConfig(
             repo_id="droid",
             base_config=DataConfig(),
+            # Make sure that this matches the batch size in the train config below.
+            # We need to set batch size twice, since the RLDS data loader handles batching internally.
+            # (to not get into a mess between tf.data and pytorch multiprocessing)
             batch_size=256,
+            # Set this to the path to your DROID RLDS dataset (the parent directory of the `droid` directory).
             rlds_data_dir="/app/karl/datasets",
         ),
         weight_loader=weight_loaders.CheckpointWeightLoader("s3://openpi-assets/checkpoints/pi0_fast_base/params"),
@@ -682,107 +686,16 @@ _CONFIGS = [
             decay_steps=1_000_000,
             decay_lr=5e-5,
         ),
-        num_train_steps=240_000,
+        num_train_steps=100_000,  # 100k steps should be sufficient, takes ~2 days on 8x H100s
         batch_size=256,
         log_interval=100,
         save_interval=5000,
-        keep_period=10_000,
+        keep_period=20_000,
         num_workers=0,  # Important: RLDS DataLoader requires num_workers=0, handles multi-processing internally
     ),
-    TrainConfig(
-        name="pi0_fast_droid_finetune_lora_r16",
-        model=pi0_fast.Pi0FASTConfig(
-            action_dim=8,
-            action_horizon=16,
-            max_token_len=180,
-            action_space=droid_rlds_dataset.DroidActionSpace.JOINT_POSITION,
-            paligemma_variant="gemma_2b_lora",
-        ),
-        data=RLDSDroidDataConfig(
-            repo_id="droid",
-            base_config=DataConfig(),
-            batch_size=128,
-            rlds_data_dir="/app/karl/datasets",
-        ),
-        weight_loader=weight_loaders.CheckpointWeightLoader("s3://openpi-assets/checkpoints/pi0_fast_base/params"),
-        freeze_filter=pi0_fast.Pi0FASTConfig(
-            action_dim=8, action_horizon=16, max_token_len=180, paligemma_variant="gemma_2b_lora"
-        ).get_freeze_filter(),
-        lr_schedule=_optimizer.CosineDecaySchedule(
-            warmup_steps=1_000,
-            peak_lr=5e-5,
-            decay_steps=1_000_000,
-            decay_lr=5e-5,
-        ),
-        num_train_steps=240_000,
-        batch_size=128,
-        log_interval=100,
-        save_interval=5000,
-        keep_period=10_000,
-        num_workers=0,  # Important: RLDS DataLoader requires num_workers=0, handles multi-processing internally
-    ),
-    TrainConfig(
-        name="pi0_fast_droid_finetune_lora_r128",
-        model=pi0_fast.Pi0FASTConfig(
-            action_dim=8,
-            action_horizon=16,
-            max_token_len=180,
-            action_space=droid_rlds_dataset.DroidActionSpace.JOINT_POSITION,
-            paligemma_variant="gemma_2b_lora_r128",
-        ),
-        data=RLDSDroidDataConfig(
-            repo_id="droid",
-            base_config=DataConfig(),
-            batch_size=128,
-            rlds_data_dir="/app/karl/datasets",
-        ),
-        weight_loader=weight_loaders.CheckpointWeightLoader("s3://openpi-assets/checkpoints/pi0_fast_base/params"),
-        freeze_filter=pi0_fast.Pi0FASTConfig(
-            action_dim=8, action_horizon=16, max_token_len=180, paligemma_variant="gemma_2b_lora_r128"
-        ).get_freeze_filter(),
-        lr_schedule=_optimizer.CosineDecaySchedule(
-            warmup_steps=1_000,
-            peak_lr=5e-5,
-            decay_steps=1_000_000,
-            decay_lr=5e-5,
-        ),
-        num_train_steps=240_000,
-        batch_size=128,
-        log_interval=100,
-        save_interval=5000,
-        keep_period=10_000,
-        num_workers=0,  # Important: RLDS DataLoader requires num_workers=0, handles multi-processing internally
-    ),
-    TrainConfig(
-        # NOT RECOMMENDED: Joint velocity actions are not compatible with simulated evaluation environments.
-        # We recommend using joint position actions for training (but joint velocity is how we trained the official
-        # pi0-fast-droid checkpoint, before we realized the issue with velocity control being hard to simulate).
-        name="pi0_fast_droid_finetune_joint_velocity",
-        model=pi0_fast.Pi0FASTConfig(
-            action_dim=8,
-            action_horizon=10,
-            max_token_len=180,
-            action_space=droid_rlds_dataset.DroidActionSpace.JOINT_VELOCITY,
-        ),
-        data=RLDSDroidDataConfig(
-            repo_id="droid_joint_velocity",
-            base_config=DataConfig(),
-            batch_size=256,
-            rlds_data_dir="/app/karl/datasets",
-        ),
-        weight_loader=weight_loaders.CheckpointWeightLoader("s3://openpi-assets/checkpoints/pi0_fast_base/params"),
-        lr_schedule=_optimizer.CosineDecaySchedule(
-            warmup_steps=2_000,
-            peak_lr=5e-5,
-            decay_steps=1_000_000,
-            decay_lr=5e-5,
-        ),
-        num_train_steps=240_000,
-        batch_size=256,
-        log_interval=100,
-        num_workers=0,  # Important: RLDS DataLoader requires num_workers=0, handles multi-processing internally
-    ),
-    # This config is used to demonstrate how to train on a simple simulated environment.
+    #
+    # ALOHA Sim configs. This config is used to demonstrate how to train on a simple simulated environment.
+    #
     TrainConfig(
         name="pi0_aloha_sim",
         model=pi0.Pi0Config(),

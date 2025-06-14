@@ -1,3 +1,10 @@
+"""
+RLDS-based data loader for DROID.
+While openpi typically uses LeRobot's data loader, it is not currently scalable enough for larger datasets like DROID.
+Thus, we provide a data loader example here that uses the RLDS data format.
+The data loader also applies a few DROID-specific data filters / transformations.
+"""
+
 from enum import Enum
 from enum import auto
 
@@ -19,12 +26,15 @@ class DroidRldsDataset(torch.utils.data.IterableDataset):
         *,  # Force keyword-only arguments
         shuffle: bool = True,
         action_chunk_size: int = 16,
+        # We default to joint position actions, since they allow policy evaluation in simulation.
         action_space: DroidActionSpace = DroidActionSpace.JOINT_POSITION,
         max_loaded_steps_per_episode: int = 100,
-        shuffle_buffer_size: int = 100_000,
+        # Reduce this if you are running out of memory, but careful -- below ~100k shuffling is not sufficiently random.
+        shuffle_buffer_size: int = 250_000,
         num_parallel_reads: int = -1,  # -1 == tf.data.AUTOTUNE -- hack to not import tf at top level
         num_parallel_calls: int = -1,  # -1 == tf.data.AUTOTUNE -- hack to not import tf at top level
     ):
+        # Import tensorflow here to not make it mandatory in case RLDS data loader is not used.
         import dlimp as dl
         import tensorflow as tf
         import tensorflow_datasets as tfds
@@ -41,6 +51,9 @@ class DroidRldsDataset(torch.utils.data.IterableDataset):
                 traj["traj_metadata"]["episode_metadata"]["file_path"][0], ".*success.*"
             )
         )
+
+        # Repeat dataset so we never run out of data.
+        dataset = dataset.repeat()
 
         def restructure(traj):
             """Reformat observation and action keys, sample language instruction."""
@@ -115,16 +128,6 @@ class DroidRldsDataset(torch.utils.data.IterableDataset):
             return tf.reduce_any(tf.abs(traj["actions"][: action_chunk_size // 2]) > 1e-3)
 
         dataset = dataset.filter(filter_idle)
-
-        def subsample(traj):
-            """Subsamples trajectories to max_loaded_steps_per_episode to ensure good shuffling."""
-            traj_len = tf.shape(traj["actions"])[0]
-            if traj_len > max_loaded_steps_per_episode:
-                indices = tf.random.shuffle(tf.range(traj_len))[:max_loaded_steps_per_episode]
-                traj = tf.nest.map_structure(lambda x: tf.gather(x, indices), traj)
-            return traj
-
-        dataset = dataset.traj_map(subsample, num_parallel_calls)
 
         # Flatten: map from trajectory dataset to dataset of individual action chunks
         dataset = dataset.flatten(num_parallel_calls=num_parallel_calls)
