@@ -25,9 +25,6 @@ def create_dataset(config: _config.TrainConfig) -> tuple[_config.DataConfig, _da
     if data_config.rlds_data_dir is not None:
         from openpi.training.droid_rlds_dataset import DroidRldsDataset
 
-        # assert (
-        #     data_config.batch_size == 1
-        # ), "Batch size must be set to 1 in DROID data config for norm stats computation."
         assert data_config.rlds_data_dir is not None, "RLDS data dir must be set for DROID data config."
         dataset = DroidRldsDataset(
             data_dir=data_config.rlds_data_dir,
