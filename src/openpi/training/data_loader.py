@@ -106,16 +106,16 @@ def create_dataset(
 ) -> Dataset:
     """Create a dataset for training."""
     if data_config.rlds_data_dir is not None:
+        # RLDS data loader requires some extra dependencies -- see examples/droid/README_train.md
         from openpi.training.droid_rlds_dataset import DroidRldsDataset
 
         assert data_config.batch_size > 0, "Batch size must be set for DROID data config."
-        assert data_config.rlds_data_dir is not None, "RLDS data dir must be set for DROID data config."
         return DroidRldsDataset(
             data_dir=data_config.rlds_data_dir,
             batch_size=data_config.batch_size,
             shuffle=shuffle,
             action_chunk_size=model_config.action_horizon,
-            action_space=model_config.action_space,
+            action_space=data_config.action_space,
         )
 
     repo_id = data_config.repo_id

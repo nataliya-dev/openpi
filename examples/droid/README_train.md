@@ -10,9 +10,7 @@ for larger datasets like DROID -- they are working on improving it though). Belo
 
 After you followed the openpi installation instructions from the main README, you need to install the following data loading dependencies for DROID RLDS training:
 ```bash
-uv pip install tensorflow_datasets==4.9.9
-uv pip install tensorflow==2.15.0
-uv pip install "dlimp @ git+https://github.com/kvablack/dlimp@ad72ce3a9b414db2185bc0b38461d4101a65477a"
+uv pip install tensorflow_datasets==4.9.9 tensorflow==2.15.0 "dlimp @ git+https://github.com/kvablack/dlimp@ad72ce3a9b414db2185bc0b38461d4101a65477a"
 uv pip install ml-dtypes==0.5.1  # somehow the previous installations mess up this package version, so we install it again
 ```
 
@@ -50,7 +48,7 @@ Thus, we do not recommend training with joint velocity actions and instead use j
 
 ## Compute Requirements
 
-Our DROID training config requires approximately 2 days on 8x H100 GPUs for convergence (100k iterations, approx. 1 epoch).
+Our DROID training config requires approximately 2 days on 8x H100 GPUs for convergence (100k iterations, bs256, approx. 1 epoch).
 If you start from PaliGemma instead of pi0 initialization, plan with ~5 days on 8x H100s (240k iterations, i.e. 3 epochs).
 
 We have experimented with LoRA for cheaper finetuning, but haven't found the policies to perform well so far.

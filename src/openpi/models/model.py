@@ -213,8 +213,6 @@ class BaseModelConfig(abc.ABC):
     action_horizon: int
     # Tokenized prompt maximum length.
     max_token_len: int
-    # Action space -- currently only used for DROID.
-    action_space: enum.Enum | None = None
 
     @property
     @abc.abstractmethod

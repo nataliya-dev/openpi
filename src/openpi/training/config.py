@@ -89,8 +89,11 @@ class DataConfig:
     prompt_from_task: bool = False
 
     # Only used for RLDS data loader (ie currently only used for DROID).
+    # This is the global batch size for the data loader.
     batch_size: int = -1
     rlds_data_dir: str | None = None
+    # Action space for DROID dataset.
+    action_space: droid_rlds_dataset.DroidActionSpace | None = None
 
 
 class GroupFactory(Protocol):
@@ -333,10 +336,10 @@ class RLDSDroidDataConfig(DataConfigFactory):
 
     batch_size: int = -1
     rlds_data_dir: str | None = None
+    action_space: droid_rlds_dataset.DroidActionSpace | None = None
 
     @override
     def create(self, assets_dirs: pathlib.Path, model_config: _model.BaseModelConfig) -> DataConfig:
-        # No repacking needed -- RLDS data loader already outputs the correct keys.
         repack_transform = _transforms.Group(
             inputs=[
                 _transforms.RepackTransform(
@@ -357,7 +360,7 @@ class RLDSDroidDataConfig(DataConfigFactory):
             outputs=[droid_policy.DroidOutputs()],
         )
 
-        if model_config.action_space == droid_rlds_dataset.DroidActionSpace.JOINT_POSITION:
+        if self.action_space == droid_rlds_dataset.DroidActionSpace.JOINT_POSITION:
             # Data loader returns absolute joint position actions -- convert to delta actions for training.
             delta_action_mask = _transforms.make_bool_mask(7, -1)
             data_transforms = data_transforms.push(
@@ -378,6 +381,7 @@ class RLDSDroidDataConfig(DataConfigFactory):
             use_quantile_norm=model_config.model_type == ModelType.PI0_FAST,
             batch_size=self.batch_size,
             rlds_data_dir=self.rlds_data_dir,
+            action_space=self.action_space,
         )
 
 
@@ -667,17 +671,16 @@ _CONFIGS = [
             action_dim=8,
             action_horizon=16,
             max_token_len=180,
-            action_space=droid_rlds_dataset.DroidActionSpace.JOINT_POSITION,
         ),
         data=RLDSDroidDataConfig(
             repo_id="droid",
-            base_config=DataConfig(),
             # Make sure that this matches the batch size in the train config below.
             # We need to set batch size twice, since the RLDS data loader handles batching internally.
             # (to not get into a mess between tf.data and pytorch multiprocessing)
             batch_size=256,
             # Set this to the path to your DROID RLDS dataset (the parent directory of the `droid` directory).
-            rlds_data_dir="/app/karl/datasets",
+            rlds_data_dir="<path_to_droid_rlds_dataset>",
+            action_space=droid_rlds_dataset.DroidActionSpace.JOINT_POSITION,
         ),
         weight_loader=weight_loaders.CheckpointWeightLoader("s3://openpi-assets/checkpoints/pi0_fast_base/params"),
         lr_schedule=_optimizer.CosineDecaySchedule(

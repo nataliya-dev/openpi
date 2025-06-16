@@ -8,8 +8,6 @@ The data loader also applies a few DROID-specific data filters / transformations
 from enum import Enum
 from enum import auto
 
-import torch
-
 
 class DroidActionSpace(Enum):
     """Action space for DROID dataset."""
@@ -18,7 +16,7 @@ class DroidActionSpace(Enum):
     JOINT_VELOCITY = auto()
 
 
-class DroidRldsDataset(torch.utils.data.IterableDataset):
+class DroidRldsDataset:
     def __init__(
         self,
         data_dir: str,
@@ -161,16 +159,3 @@ class DroidRldsDataset(torch.utils.data.IterableDataset):
         # This is the approximate number of samples in DROID after filtering.
         # Easier to hardcode than to iterate through the dataset and compute it.
         return 20_000_000
-
-    def __getitem__(self, idx):
-        raise NotImplementedError("RLDS datasets do not support indexing.")
-
-
-if __name__ == "__main__":
-    import time
-
-    dataset = DroidRldsDataset(data_dir="/app/karl/datasets", batch_size=256)
-    last_time = time.time()
-    for _batch in dataset:
-        print(time.time() - last_time)
-        last_time = time.time()
