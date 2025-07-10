@@ -11,6 +11,11 @@ import rich
 import tqdm
 import tyro
 
+#realsense imports
+import pyrealsense2 as rs
+import numpy as np
+import cv2
+
 logger = logging.getLogger(__name__)
 
 
@@ -38,7 +43,7 @@ class Args:
     # Path to save the timings to a parquet file. (e.g., timing.parquet)
     timing_file: pathlib.Path | None = None
     # Environment to run the policy in.
-    env: EnvMode = EnvMode.ALOHA_SIM
+    env: EnvMode = EnvMode.DROID
 
 
 class TimingRecorder:
@@ -115,12 +120,6 @@ class TimingRecorder:
 
 
 def main(args: Args) -> None:
-    obs_fn = {
-        EnvMode.ALOHA: _random_observation_aloha,
-        EnvMode.ALOHA_SIM: _random_observation_aloha,
-        EnvMode.DROID: _random_observation_droid,
-        EnvMode.LIBERO: _random_observation_libero,
-    }[args.env]
 
     policy = _websocket_client_policy.WebsocketClientPolicy(
         host=args.host,
@@ -128,6 +127,24 @@ def main(args: Args) -> None:
         api_key=args.api_key,
     )
     logger.info(f"Server metadata: {policy.get_server_metadata()}")
+
+    pipeline_1 = rs.pipeline()
+    config_1 = rs.config()
+    config_1.enable_device('943222071556')
+    config_1.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
+    # ...from Camera 2
+    pipeline_2 = rs.pipeline()
+    config_2 = rs.config()
+    config_2.enable_device('838212073252')
+    config_2.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
+
+
+    # Start streaming from both cameras
+    pipeline_1.start(config_1)
+    pipeline_2.start(config_2)
+
+    obs_fn = lambda:_observation_droid(pipeline_1, pipeline_2)
+
 
     # Send a few observations to make sure the model is loaded.
     for _ in range(2):
@@ -150,35 +167,38 @@ def main(args: Args) -> None:
         timing_recorder.write_parquet(args.timing_file)
 
 
-def _random_observation_aloha() -> dict:
-    return {
-        "state": np.ones((14,)),
-        "images": {
-            "cam_high": np.random.randint(256, size=(3, 224, 224), dtype=np.uint8),
-            "cam_low": np.random.randint(256, size=(3, 224, 224), dtype=np.uint8),
-            "cam_left_wrist": np.random.randint(256, size=(3, 224, 224), dtype=np.uint8),
-            "cam_right_wrist": np.random.randint(256, size=(3, 224, 224), dtype=np.uint8),
-        },
-        "prompt": "do something",
-    }
+def _observation_droid(pipeline_1, pipeline_2):
+
+    frames_1 = pipeline_1.wait_for_frames()
+    frames_2 = pipeline_2.wait_for_frames()
+    # depth_frame = frames.get_depth_frame()
+    color_frame_1 = frames_1.get_color_frame()
+    color_frame_2 = frames_2.get_color_frame()
+    
+    if  not color_frame_1 or not color_frame_2:
+        raise Exception("no color frame")
+
+    # Convert images to numpy arrays
+    # depth_image = np.asanyarray(depth_frame.get_data())
+    color_image_1 = np.asanyarray(color_frame_1.get_data())
+    print(f"image size {color_image_1.shape}")
+
+    color_image_2 = np.asanyarray(color_frame_2.get_data())
+    print(f"image size {color_image_2.shape}")
 
 
-def _random_observation_droid() -> dict:
+    resized_1 = cv2.resize(color_image_1, (224, 224))
+    print(f"resized size {resized_1.shape}")
+
+    resized_2 = cv2.resize(color_image_2, (224, 224))
+    print(f"resized size {resized_2.shape}")
+
     return {
-        "observation/exterior_image_1_left": np.random.randint(256, size=(224, 224, 3), dtype=np.uint8),
-        "observation/wrist_image_left": np.random.randint(256, size=(224, 224, 3), dtype=np.uint8),
+        "observation/exterior_image_1_left" : resized_1,
+        "observation/wrist_image_left": resized_2,
         "observation/joint_position": np.random.rand(7),
         "observation/gripper_position": np.random.rand(1),
-        "prompt": "do something",
-    }
-
-
-def _random_observation_libero() -> dict:
-    return {
-        "observation/state": np.random.rand(8),
-        "observation/image": np.random.randint(256, size=(224, 224, 3), dtype=np.uint8),
-        "observation/wrist_image": np.random.randint(256, size=(224, 224, 3), dtype=np.uint8),
-        "prompt": "do something",
+        "prompt": "pick up a cup",
     }
 
 
